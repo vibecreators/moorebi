@@ -1,4 +1,6 @@
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseServer, requireEntity } from "@/lib/supabase/server";
+import { ActionForm, Field, Input, Textarea, Hidden } from "@/components/ActionForm";
+import { saveWeeklyReview } from "@/app/actions/operate";
 import { Panel, Empty, StageHeader, naira } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,7 @@ const QUESTIONS = [
 
 export default async function ReviewPage() {
   const sb = supabaseServer();
+  const entity = await requireEntity();
   const [reviews, settlement, commitments] = await Promise.all([
     sb.from("weekly_reviews").select("*").order("week_start", { ascending: false }),
     sb.from("invoice_settlement").select("outstanding, is_overdue"),
@@ -50,6 +53,25 @@ export default async function ReviewPage() {
           </li>
         </ul>
       </Panel>
+
+      <div className="mt-4">
+        <Panel title="Run this week's review" subtitle="Eight questions. Answering them is the habit the product exists to create.">
+          <ActionForm action={saveWeeklyReview} submitLabel="Save review">
+            <Hidden name="entity_id" value={entity.id} />
+            <Field label="Week starting"><Input name="week_start" type="date" required /></Field>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <Field label="What happened?"><Textarea name="what_happened" /></Field>
+              <Field label="What changed materially?"><Textarea name="material_changes" /></Field>
+              <Field label="What cash was collected?"><Textarea name="cash_collected" /></Field>
+              <Field label="What cash is overdue?"><Textarea name="cash_overdue" /></Field>
+              <Field label="What is blocked?"><Textarea name="blocked" /></Field>
+              <Field label="What is the current constraint?"><Textarea name="current_constraint" /></Field>
+              <Field label="What decision is required?"><Textarea name="decision_required" /></Field>
+              <Field label="What did we learn?"><Textarea name="learned" /></Field>
+            </div>
+          </ActionForm>
+        </Panel>
+      </div>
 
       <div className="mt-4 space-y-4">
         {rows.length === 0 ? (

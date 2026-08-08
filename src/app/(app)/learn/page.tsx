@@ -1,4 +1,6 @@
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseServer, requireEntity } from "@/lib/supabase/server";
+import { ActionForm, Field, Input, Textarea, Select, Hidden } from "@/components/ActionForm";
+import { recordOutcome, addLearning } from "@/app/actions/operate";
 import { Panel, Tag, Empty, StageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,8 @@ const CLASS_TONE = {
 
 export default async function LearnPage() {
   const sb = supabaseServer();
+  const entity = await requireEntity();
+  const interventions = await sb.from("interventions").select("id, description");
   const [outcomes, learnings] = await Promise.all([
     sb.from("outcomes").select("*").order("reviewed_on", { ascending: false }),
     sb.from("learnings").select("*").order("created_at", { ascending: false }),
@@ -24,6 +28,35 @@ export default async function LearnPage() {
         produced — including the things nobody predicted. An organization that never does this
         cannot tell a good decision from a lucky one.
       </p>
+
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <Panel title="Review an outcome" subtitle="Expected against actual. Classified honestly, including harmful.">
+          <ActionForm action={recordOutcome} submitLabel="Record outcome">
+            <Hidden name="entity_id" value={entity.id} />
+            <Field label="Against intervention">
+              <select name="intervention_id"
+                      className="w-full rounded-lg border border-edge bg-ink px-2.5 py-1.5 text-sm text-text outline-none focus:border-accent">
+                <option value="">— none —</option>
+                {(interventions.data ?? []).map((i) => <option key={i.id} value={i.id}>{i.description}</option>)}
+              </select>
+            </Field>
+            <Field label="What did we expect?"><Textarea name="expected" /></Field>
+            <Field label="What actually happened?"><Textarea name="actual" required /></Field>
+            <Field label="Classification">
+              <Select name="classification" options={["confirmed","partially_confirmed","inconclusive","rejected","harmful","not_used"]} />
+            </Field>
+            <Field label="Unintended consequences"><Textarea name="unintended" /></Field>
+          </ActionForm>
+        </Panel>
+
+        <Panel title="Record a learning" subtitle="A conclusion that should change what happens next time.">
+          <ActionForm action={addLearning} submitLabel="Save learning">
+            <Hidden name="entity_id" value={entity.id} />
+            <Field label="What did we learn?"><Textarea name="statement" required /></Field>
+            <Field label="Applies to"><Input name="applies_to" placeholder="Any receivable on terms longer than 30 days" /></Field>
+          </ActionForm>
+        </Panel>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Outcomes" subtitle="Expected versus actual, classified honestly.">

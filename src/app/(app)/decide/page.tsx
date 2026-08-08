@@ -1,4 +1,6 @@
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseServer, requireEntity } from "@/lib/supabase/server";
+import { ActionForm, Field, Input, Textarea, Select, Hidden } from "@/components/ActionForm";
+import { createDecision, approveDecision } from "@/app/actions/operate";
 import { Panel, Evidence, Tag, Empty, StageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,7 @@ const CATEGORY_TONE = {
 
 export default async function DecidePage() {
   const sb = supabaseServer();
+  const entity = await requireEntity();
   const { data } = await sb.from("decisions").select("*").order("created_at", { ascending: false });
   const rows = data ?? [];
 
@@ -30,6 +33,25 @@ export default async function DecidePage() {
         considered, the mechanism by which the choice is supposed to work, what must not be
         damaged, who held the authority — and any dissent, preserved rather than tidied away.
       </p>
+
+      <div className="mb-4">
+        <Panel title="Request a decision" subtitle="The memo is the point. A title alone is a task, not a decision.">
+          <ActionForm action={createDecision} submitLabel="Record decision request">
+            <Hidden name="entity_id" value={entity.id} />
+            <Field label="What is being decided?"><Input name="title" required placeholder="Suspend credit for accounts over 45 days" /></Field>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <Field label="Category"><Select name="category" options={["keep","build","repair","redesign","delay","stop"]} /></Field>
+              <Field label="Confidence"><Select name="confidence" options={["unknown","assumption","judgment","inferred","reported","calculated","confirmed"]} /></Field>
+            </div>
+            <Field label="Why now?"><Textarea name="context" /></Field>
+            <Field label="Alternatives considered"><Textarea name="alternatives" placeholder="One per line" /></Field>
+            <Field label="Recommendation"><Textarea name="recommendation" /></Field>
+            <Field label="Expected mechanism — how is this supposed to produce the result?"><Textarea name="expected_mechanism" /></Field>
+            <Field label="Must protect"><Textarea name="must_protect" /></Field>
+            <Field label="Dissent — who disagreed, and why?"><Textarea name="dissent" placeholder="Preserved, not tidied away" /></Field>
+          </ActionForm>
+        </Panel>
+      </div>
 
       {rows.length === 0 ? <Empty what="No decisions recorded." /> : (
         <div className="space-y-4">
@@ -69,6 +91,22 @@ export default async function DecidePage() {
                 {d.review_on && <span>Review due {d.review_on}</span>}
                 {d.reviewed_at && <span className="text-good">Reviewed</span>}
               </div>
+
+              {d.status !== "approved" && (
+                <div className="mt-3 rounded-lg border border-edge bg-ink/40 p-3">
+                  <ActionForm action={approveDecision} submitLabel="Authorise">
+                    <Hidden name="entity_id" value={entity.id} />
+                    <Hidden name="decision_id" value={d.id} />
+                    <Field label="Review date — when will we check whether this worked?">
+                      <Input name="review_on" type="date" required />
+                    </Field>
+                    <p className="text-[11px] leading-relaxed text-muted">
+                      Approving records you as the authority. A review date is mandatory: the database
+                      rejects an approved decision that nobody has undertaken to review.
+                    </p>
+                  </ActionForm>
+                </div>
+              )}
             </Panel>
           ))}
         </div>

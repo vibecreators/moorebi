@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { supabaseServer, requireEntity } from "@/lib/supabase/server";
 import { Panel, Stat, Evidence, Tag, Empty, StageHeader, naira } from "@/components/ui";
+import { ActionForm, Hidden } from "@/components/ActionForm";
+import { acknowledgeSignal } from "@/app/actions/operate";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +78,12 @@ export default async function Briefing() {
                       </div>
                     </div>
                     {s.detail && <p className="mt-2 text-sm leading-relaxed text-muted">{s.detail}</p>}
+                    <div className="mt-2">
+                      <ActionForm action={acknowledgeSignal} submitLabel="Acknowledge">
+                        <Hidden name="entity_id" value={entity.id} />
+                        <Hidden name="signal_id" value={s.id} />
+                      </ActionForm>
+                    </div>
                   </li>
                 ))}
               </ul>

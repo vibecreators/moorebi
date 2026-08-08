@@ -10,6 +10,45 @@
 
 ---
 
+---
+
+# ⟳ Remediation record — 2026-08-08, same day
+
+Every P1 in this report has been addressed and re-tested. **The original findings below are
+left unedited**; a remediation log that quietly rewrites the audit it answers is worthless.
+
+| Finding | Fix | Re-test |
+|---|---|---|
+| **P1-1** app is read-only | 11 server actions + forms across Observe, Execute, Decide, Review, Learn | Build green; a signed-in user recorded a ₦2m payment and collected cash moved ₦0 → ₦2m |
+| **P1-2** no AI | **Not fixed — deliberately deferred.** See below. | — |
+| **P1-3** contracted/booked unrepresentable | `contracts` + `bookings` + `revenue_states` view | Four states produced **exactly**: ₦63m / ₦55m / ₦48m / ₦31m |
+| **P1-4** audit_log has no writer | DB triggers on 23 tables capturing actor, action, before, after | `issued→disputed→issued` captured; **actor id present** on a real user write |
+| **P1-5** no closed-loop retrieval | `/remember` rebuilt to walk decision → issue → hypotheses → constraint → intervention → outcome → learning | Renders the 7-step chain; missing links show as explicit gaps |
+| **P1-6** overpayment accepted | `trg_payment_integrity` | Blocked — including 1 kobo over. Legitimate part-payments still sum exactly |
+| **P1-7** currency mismatch accepted | same trigger | USD-vs-NGN blocked for service role **and** signed-in user |
+
+**Guards were placed in the database, not TypeScript** — the direct lesson of P1-7, where a
+passing unit test certified an invariant enforced only in a function the write path never called.
+Two new tenant-consistency guards were added while there: a payment cannot be filed against
+another tenant's invoice, and an invoice cannot point at another tenant's customer.
+
+`tests/actions.test.ts` now fails the build if any server action omits `assertMember`, and asserts
+`member` is not a write role — closing the predecessor's 84-unguarded-actions hole by construction.
+
+**Verdict after remediation: still FAIL, and it should be.** The blockers are closed, but the
+standard in §65 is not met by fixing defects. It is met by a real business using the system, and
+the two things that still prevent that are unchanged:
+
+1. **No AI (P1-2)** — deferred on the audit's own recommendation ("Only then: Copilot"). Building
+   a Copilot before the write paths had ever been exercised would repeat the predecessor's error.
+2. **The CI isolation gate has still never run.** Four repository secrets remain absent, so every
+   tenancy claim here — including today's — is a manual result that nothing re-verifies.
+
+Also still open and unchanged: no projects, risks, documents, roles or integrations; backup and
+restore **UNKNOWN**; performance **UNKNOWN**; the app never exercised through a browser.
+
+---
+
 # Executive verdict
 
 ## **FAIL**

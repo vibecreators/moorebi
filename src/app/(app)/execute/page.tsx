@@ -1,11 +1,24 @@
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseServer, requireEntity } from "@/lib/supabase/server";
 import { Panel, Tag, Empty, StageHeader, naira } from "@/components/ui";
+import { ActionForm, Field, Input, Textarea, Hidden } from "@/components/ActionForm";
+import { recordPayment, createCommitment, completeCommitment } from "@/app/actions/operate";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExecutePage() {
   const sb = supabaseServer();
+  const entity = await requireEntity();
   const today = new Date().toISOString().slice(0, 10);
+
+  const openInvoices = await sb
+    .from("invoice_settlement")
+    .select("invoice_id, outstanding")
+    .gt("outstanding", 0);
+  const invoiceMeta = await sb.from("invoices").select("id, invoice_no, amount");
+  const payable = (openInvoices.data ?? []).map((s) => {
+    const m = (invoiceMeta.data ?? []).find((i) => i.id === s.invoice_id);
+    return { id: s.invoice_id, label: `${m?.invoice_no ?? "?"} — ${naira(Number(s.outstanding))} outstanding` };
+  });
 
   const [interventions, commitments, opportunities, followUps] = await Promise.all([
     sb.from("interventions").select("*").order("started_on", { ascending: false }),
@@ -20,6 +33,51 @@ export default async function ExecutePage() {
   return (
     <>
       <StageHeader stage="Execute" />
+
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <Panel title="Record a collection"
+               subtitle="Cash received. This is the only way collected cash enters MOORE OS.">
+          {payable.length === 0 ? <Empty what="No invoices with an outstanding balance." /> : (
+            <ActionForm action={recordPayment} submitLabel="Record payment">
+              <Hidden name="entity_id" value={entity.id} />
+              <Field label="Against invoice">
+                <select name="invoice_id" required
+                        className="w-full rounded-lg border border-edge bg-ink px-2.5 py-1.5 text-sm text-text outline-none focus:border-accent">
+                  {payable.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </Field>
+              <div className="grid grid-cols-2 gap-2.5">
+                <Field label="Amount (₦)"><Input name="amount" required inputMode="decimal" placeholder="250000" /></Field>
+                <Field label="Date received"><Input name="received_on" type="date" required defaultValue={today} /></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <Field label="Method"><Input name="method" placeholder="transfer" /></Field>
+                <Field label="Reference"><Input name="reference" placeholder="optional" /></Field>
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted">
+                Recorded as <span className="text-warn">reported</span>, not confirmed — it was typed by a
+                person, not read from a bank feed. The database refuses payments that exceed the invoice
+                or use a different currency.
+              </p>
+            </ActionForm>
+          )}
+        </Panel>
+
+        <Panel title="Make a commitment"
+               subtitle="One promised result, one owner, one date.">
+          <ActionForm action={createCommitment} submitLabel="Commit">
+            <Hidden name="entity_id" value={entity.id} />
+            <Field label="Promised result">
+              <Textarea name="promised_result" required placeholder="Agree a payment plan with Ndu Agency for the ₦4.8m balance" />
+            </Field>
+            <Field label="Due date"><Input name="due_date" type="date" required /></Field>
+            <p className="text-[11px] leading-relaxed text-muted">
+              You are the accountable owner. Closing it will require completion evidence — the database
+              rejects &ldquo;met&rdquo; without it.
+            </p>
+          </ActionForm>
+        </Panel>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Interventions" subtitle="What was actually changed — distinct from what was decided.">
@@ -69,6 +127,18 @@ export default async function ExecutePage() {
                       Due {c.due_date}
                       {c.completion_evidence && <> · {c.completion_evidence}</>}
                     </p>
+                    {c.status !== "met" && (
+                      <div className="mt-2 rounded-lg border border-edge bg-ink/40 p-2.5">
+                        <ActionForm action={completeCommitment} submitLabel="Mark met">
+                          <Hidden name="entity_id" value={entity.id} />
+                          <Hidden name="commitment_id" value={c.id} />
+                          <Field label="Completion evidence — what shows this actually happened?">
+                            <Input name="completion_evidence" required
+                                   placeholder="Email sent 5 Aug, acknowledged same day" />
+                          </Field>
+                        </ActionForm>
+                      </div>
+                    )}
                   </li>
                 );
               })}
