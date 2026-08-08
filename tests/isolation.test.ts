@@ -24,21 +24,24 @@ const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const PW = process.env.TEST_USER_PASSWORD;
 
+function missingCredentials(): string[] {
+  return [
+    ["NEXT_PUBLIC_SUPABASE_URL", URL],
+    ["NEXT_PUBLIC_SUPABASE_ANON_KEY", ANON],
+    ["SUPABASE_SERVICE_ROLE_KEY", SERVICE],
+    ["TEST_USER_PASSWORD", PW],
+  ].filter(([, v]) => !v).map(([k]) => k as string);
+}
+
+const CREDENTIAL_FAILURE =
+  `Tenant isolation cannot be proven: missing ${missingCredentials().join(", ")}. ` +
+  `This is a FAILURE, not a skip — an unprovable isolation boundary is ` +
+  `indistinguishable from a broken one. Set these as repository secrets ` +
+  `(see .github/workflows/ci.yml) or in .env.local for a local run.`;
+
 describe("tenant isolation gate", () => {
   it("has the credentials required to prove isolation", () => {
-    const missing = [
-      ["NEXT_PUBLIC_SUPABASE_URL", URL],
-      ["NEXT_PUBLIC_SUPABASE_ANON_KEY", ANON],
-      ["SUPABASE_SERVICE_ROLE_KEY", SERVICE],
-      ["TEST_USER_PASSWORD", PW],
-    ].filter(([, v]) => !v).map(([k]) => k);
-
-    expect(
-      missing,
-      `Tenant isolation cannot be proven: missing ${missing.join(", ")}. ` +
-        `This is a FAILURE, not a skip — an unprovable isolation boundary is ` +
-        `indistinguishable from a broken one.`,
-    ).toEqual([]);
+    expect(missingCredentials(), CREDENTIAL_FAILURE).toEqual([]);
   });
 });
 
@@ -66,8 +69,13 @@ async function signIn(email: string): Promise<SupabaseClient> {
 
 describe("cross-tenant reads and writes", () => {
   beforeAll(async () => {
-    if (!URL || !ANON || !SERVICE || !PW) return; // the gate above already failed
-    admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
+    // Fail here with the real reason rather than returning early. An early
+    // return leaves the clients undefined, and every test below then dies of
+    // "Cannot read properties of undefined" — eight misleading TypeErrors
+    // burying the one fact that matters. Throwing in beforeAll attributes the
+    // whole suite to its actual cause.
+    if (missingCredentials().length > 0) throw new Error(CREDENTIAL_FAILURE);
+    admin = createClient(URL!, SERVICE!, { auth: { persistSession: false } });
 
     const mk = async (email: string) => {
       const { data, error } = await admin.auth.admin.createUser({
