@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:isolation": "vitest run tests/isolation.test.ts"
+    "test:isolation": "vitest run tests/isolation.test.ts",
+    "test:unit": "vitest run --exclude \"**/isolation.test.ts\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
