@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Two independent jobs on purpose.
+#
+# `verify` needs no secrets, so it reports honestly on every commit and from
+# every fork. `isolation` needs live credentials and fails — never skips —
+# without them.
+#
+# They were one job until the isolation gate started failing first, which meant
+# `next build` never ran and nobody could tell whether the app still compiled.
+# One red check was hiding the answer to a completely unrelated question.
+jobs:
+  verify:
+    name: Typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Pure functions, no I/O — the money invariants gate every commit.
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_POSTHOG_KEY: placeholder
+          NEXT_PUBLIC_POSTHOG_HOST: https://eu.posthog.com
+
+  isolation:
+    name: Tenant isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+
+      # The predecessor build's equivalent suite called describe.skip when its
+      # secrets were absent. CI never supplied them, so it skipped silently for
+      # its entire life and every green check was 221 unit tests while the
+      # boundary protecting customer data had never once executed.
+      #
+      # This one fails instead. Removing a secret turns CI red rather than
+      # quietly narrowing what is being tested.
+      - name: Prove tenant isolation
+        run: npm run test:isolation
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
