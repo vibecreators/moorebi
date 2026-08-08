@@ -1,37 +1,75 @@
-# moorebi
+# MOORE OS
 
-**This repository contains no application code.** As of 2026-08-07 it holds a single
-`.gitkeep` and the strategy artefacts under [`docs/`](docs/).
+The operating-intelligence layer for founder-led businesses. It sits above and between the
+systems a business already runs, and carries it around one loop:
 
-## Where MOORE BI actually lives
+`OBSERVE → MODEL → VALIDATE → DIAGNOSE → DECIDE → EXECUTE → REVIEW → LEARN → REMEMBER`
 
-| Asset | Location | Status |
-|---|---|---|
-| Application code | `vibecreators/MOORE` | Live — 319 files, 48 routes, 39 migrations |
-| Database | Supabase `moore-os` (`cktzzimjziuantrgemxe`) | Live — 47 tables, RLS on all |
-| Canonical strategy artefacts | `vibecreators/MOORE` → `docs/` | Live — 9 of 40 required files exist |
-| Build memory | `vibecreators/MOORE` → `outputs/` | Live — 41 files, ~125 cycles |
-| Deploy target | Netlify site `moore-os` | Configured; auto-deploy unverified |
+Start with [`docs/00-product-charter.md`](docs/00-product-charter.md).
 
-**The source of truth for the MOORE BI programme is `vibecreators/MOORE`, not this
-repository.** Nothing here supersedes it.
+## Status
 
-## Why this repository exists
+**Phase 1 — Operating Control · foundation laid, no UI yet.**
 
-Unresolved. The name matches the MOORE OS → **MOORE BI** product rename recorded in
-`outputs/moore-bi-brand-migration.md` (Cycle 31), which explicitly *deferred* the
-repository rename as "cosmetic; would rewrite webhook URLs — do with care". This repo may
-be the intended destination of that deferred migration, or it may be unrelated.
+| Piece | State |
+|---|---|
+| Ontology and schema | ✅ 19 tables, live on Supabase `moore-os` |
+| Tenant isolation | ✅ proven — 12/12 checks against the live schema |
+| Money invariants | ✅ 11/11 tests |
+| Security advisor | ✅ zero findings |
+| Application UI | ⬜ next cycle |
+| Copilot | ⬜ next cycle |
 
-**This is an open question for the founder** — see
-[`docs/00-phase-0-audit.md` §9](docs/00-phase-0-audit.md). Until it is answered, no code
-or canonical artefact should be authored here, because doing so forks the programme's
-source of truth. That failure has already occurred once: the Notion page *"MOORE OS — Build
-Loop Memory (Cycle 1)"* still reports "14 tables" and a completed MVP, against a live
-system that has since reached 47 tables and ~125 cycles.
+## This is a rebuild
 
-## Contents
+It replaces an earlier build in `vibecreators/MOORE`, retired on 2026-08-07 because the MOORE
+concept changed materially ([D-001](docs/15-decision-log.md)). All infrastructure connections
+were carried over — same Supabase project, same PostHog project, same Netlify site, **no new
+credentials** ([D-002](docs/15-decision-log.md)).
 
-- [`docs/00-phase-0-audit.md`](docs/00-phase-0-audit.md) — Phase 0 orchestrator audit,
-  independent re-verification of the standing risk register, two new defects, and the
-  Build-Readiness Decision.
+The predecessor's audit is preserved in
+[`docs/00-phase-0-audit.md`](docs/00-phase-0-audit.md). Several of its findings are encoded
+here as regression guards rather than prose:
+
+- Collected cash lives only in `payments` — there is no `paid` flag to forget to set.
+- Estimates carry an `evidence_status` and are never summed under a revenue label.
+- Re-notification requires a state change and a capped escalation step.
+- The isolation suite **fails** when it cannot run, instead of skipping silently.
+
+## Setup
+
+```bash
+npm ci
+cp .env.example .env.local     # fill SUPABASE_SERVICE_ROLE_KEY and TEST_USER_PASSWORD
+npm run dev
+```
+
+## Tests
+
+```bash
+npm test              # everything
+npm run test:isolation # cross-tenant isolation only
+```
+
+`tests/isolation.test.ts` creates two disposable tenants against the live project and deletes
+them afterwards. It requires `SUPABASE_SERVICE_ROLE_KEY` and `TEST_USER_PASSWORD`, and
+**fails rather than skips** without them — an unprovable isolation boundary is
+indistinguishable from a broken one.
+
+## Migrations
+
+`supabase/migrations/` mirrors what is applied to the live project, in order. `0002` and
+`0003` exist because an isolation probe caught three defects in `0001` that reading it had
+not: missing grants, a view that bypassed RLS, and auth helpers whose `EXECUTE` had been
+revoked from the very policies that call them. Each is documented in place.
+
+## Documents
+
+| | |
+|---|---|
+| [00 Product charter](docs/00-product-charter.md) | What this is, the product test, the invariants |
+| [14 Constraint log](docs/14-constraint-log.md) | What is actually limiting the programme |
+| [15 Decision log](docs/15-decision-log.md) | Material decisions, with preserved dissent |
+| [18 Roadmap](docs/18-product-roadmap.md) | Phases, and the Phase 1 release definition |
+| [20 Domain model](docs/20-domain-model.md) | The seventeen-object ontology |
+| [00 Phase 0 audit](docs/00-phase-0-audit.md) | Audit of the retired predecessor |
