@@ -2,7 +2,7 @@
   "name": "moore-os",
   "version": "0.1.0",
   "private": true,
-  "description": "MOORE OS — the operating-intelligence layer for founder-led businesses. Phase 1: Operating Control.",
+  "description": "MOORE OS \u2014 the operating-intelligence layer for founder-led businesses. Phase 1: Operating Control.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.45.4",
+    "@supabase/supabase-js": "^2.112.2",
     "next": "^14.2.35",
     "posthog-js": "^1.161.6",
     "react": "^18.3.1",
